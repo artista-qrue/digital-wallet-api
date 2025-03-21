@@ -1,330 +1,395 @@
 package com.wallet.api.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wallet.api.dto.CreateTransactionRequest;
-import com.wallet.api.dto.TransactionDto;
-import com.wallet.api.entity.Transaction;
-import com.wallet.api.entity.Wallet;
-import com.wallet.api.exception.InsufficientBalanceException;
-import com.wallet.api.exception.ResourceNotFoundException;
-import com.wallet.api.service.CustomerService;
-import com.wallet.api.service.TransactionService;
-import com.wallet.api.service.WalletService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.hamcrest.Matchers.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wallet.api.dto.ApproveTransactionRequest;
+import com.wallet.api.dto.DepositRequest;
+import com.wallet.api.dto.TransactionDto;
+import com.wallet.api.dto.WalletDto;
+import com.wallet.api.dto.WithdrawRequest;
+import com.wallet.api.entity.Transaction;
+import com.wallet.api.entity.Wallet;
+import com.wallet.api.exception.InsufficientBalanceException;
+import com.wallet.api.security.WithMockCustomer;
+import com.wallet.api.service.CustomerService;
+import com.wallet.api.service.TransactionService;
+import com.wallet.api.service.WalletService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
 public class TransactionControllerTest {
+
+    @Autowired
+    private WebApplicationContext context;
 
     private MockMvc mockMvc;
 
-    @Mock
+    @MockBean
     private TransactionService transactionService;
 
-    @Mock
+    @MockBean
     private CustomerService customerService;
 
-    @Mock
+    @MockBean
     private WalletService walletService;
-
-    @InjectMocks
-    private TransactionController transactionController;
 
     private ObjectMapper objectMapper;
     private TransactionDto transactionDto;
-    private CreateTransactionRequest createTransactionRequest;
+    private DepositRequest depositRequest;
+    private WithdrawRequest withdrawRequest;
+    private WalletDto walletDto;
 
     @BeforeEach
     void setUp() {
-        mockMvc = MockMvcBuilders.standaloneSetup(transactionController).build();
+        mockMvc = MockMvcBuilders
+            .webAppContextSetup(context)
+            .apply(SecurityMockMvcConfigurers.springSecurity())
+            .build();
         objectMapper = new ObjectMapper();
-
+        objectMapper.findAndRegisterModules();
         transactionDto = new TransactionDto(
-                1L,
-                BigDecimal.valueOf(100),
-                Transaction.Type.DEPOSIT,
-                Transaction.Status.COMPLETED,
-                "Deposit transaction",
-                1L,
-                LocalDateTime.now()
+            1L,
+            1L,
+            BigDecimal.valueOf(100),
+            Transaction.TransactionType.DEPOSIT,
+            Transaction.OppositePartyType.IBAN,
+            "Bank account",
+            Transaction.TransactionStatus.APPROVED,
+            LocalDateTime.now()
         );
 
-        createTransactionRequest = new CreateTransactionRequest(
-                BigDecimal.valueOf(100),
-                "Deposit transaction",
-                1L
+        walletDto = new WalletDto(
+            1L,
+            "My Wallet",
+            Wallet.Currency.USD,
+            true,
+            true,
+            BigDecimal.valueOf(1000),
+            BigDecimal.valueOf(1000),
+            1L
+        );
+
+        depositRequest = new DepositRequest(
+            BigDecimal.valueOf(100),
+            1L,
+            "Bank account",
+            Transaction.OppositePartyType.IBAN
+        );
+
+        withdrawRequest = new WithdrawRequest(
+            BigDecimal.valueOf(100),
+            1L,
+            "Bank account",
+            Transaction.OppositePartyType.IBAN
         );
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void deposit_ShouldReturnCreatedTransaction_WhenValidInput() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
-        when(walletService.getWalletByIdAndCustomerId(anyLong(), anyLong())).thenReturn(null); // Not actually used in the test
-        when(transactionService.deposit(any(CreateTransactionRequest.class))).thenReturn(transactionDto);
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto);
+        when(transactionService.deposit(any(DepositRequest.class))).thenReturn(transactionDto);
 
-        // Act & Assert
         mockMvc.perform(post("/api/transactions/deposit")
-                        .header("X-Customer-Id", "1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createTransactionRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Deposit transaction created successfully")))
-                .andExpect(jsonPath("$.data.id", is(1)))
-                .andExpect(jsonPath("$.data.amount", is(100)))
-                .andExpect(jsonPath("$.data.type", is("DEPOSIT")))
-                .andExpect(jsonPath("$.data.status", is("COMPLETED")))
-                .andExpect(jsonPath("$.data.walletId", is(1)));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(depositRequest)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Deposit created successfully")))
+            .andExpect(jsonPath("$.data.id", is(1)))
+            .andExpect(jsonPath("$.data.amount", is(100)))
+            .andExpect(jsonPath("$.data.type", is("DEPOSIT")))
+            .andExpect(jsonPath("$.data.status", is("APPROVED")))
+            .andExpect(jsonPath("$.data.walletId", is(1)));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void deposit_ShouldReturnForbidden_WhenCustomerDepositsToOtherWallet() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
-        when(walletService.getWalletByIdAndCustomerId(anyLong(), anyLong()))
-                .thenThrow(new ResourceNotFoundException("Wallet", "id", 1L));
 
-        // Act & Assert
+        WalletDto otherWallet = new WalletDto(
+            1L,
+            "Other Wallet",
+            Wallet.Currency.USD,
+            true,
+            true,
+            BigDecimal.valueOf(1000),
+            BigDecimal.valueOf(1000),
+            2L
+        );
+
+        when(walletService.getWalletById(anyLong())).thenReturn(otherWallet);
+
         mockMvc.perform(post("/api/transactions/deposit")
-                        .header("X-Customer-Id", "2") // Different customer ID
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createTransactionRequest)))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.result", is("ERROR")))
-                .andExpect(jsonPath("$.message", is("Wallet not found with id: '1'")))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(depositRequest)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.result", is("ERROR")))
+            .andExpect(jsonPath("$.message", is("You can only deposit to your own wallets unless you are an employee")))
+            .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = true)
     void deposit_ShouldAllowDeposit_WhenEmployeeDepositsToAnyWallet() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(true);
-        when(transactionService.deposit(any(CreateTransactionRequest.class))).thenReturn(transactionDto);
+
+        WalletDto customerWallet = new WalletDto(
+            1L,
+            "Customer Wallet",
+            Wallet.Currency.USD,
+            true,
+            true,
+            BigDecimal.valueOf(1000),
+            BigDecimal.valueOf(1000),
+            2L
+        );
+
+        when(walletService.getWalletById(anyLong())).thenReturn(customerWallet);
+        when(transactionService.deposit(any(DepositRequest.class))).thenReturn(transactionDto);
 
         // Act & Assert
         mockMvc.perform(post("/api/transactions/deposit")
-                        .header("X-Customer-Id", "2") // Employee ID
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createTransactionRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Deposit transaction created successfully")))
-                .andExpect(jsonPath("$.data.id", is(1)));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(depositRequest)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Deposit created successfully")))
+            .andExpect(jsonPath("$.data.id", is(1)));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void withdraw_ShouldReturnCreatedTransaction_WhenValidInput() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
-        when(walletService.getWalletByIdAndCustomerId(anyLong(), anyLong())).thenReturn(null); // Not actually used in the test
-        when(transactionService.withdraw(any(CreateTransactionRequest.class))).thenReturn(transactionDto);
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto);
 
-        // Modify transactionDto for withdrawal
-        transactionDto = new TransactionDto(
-                1L,
-                BigDecimal.valueOf(100),
-                Transaction.Type.WITHDRAW,
-                Transaction.Status.COMPLETED,
-                "Withdraw transaction",
-                1L,
-                LocalDateTime.now()
+        TransactionDto withdrawalDto = new TransactionDto(
+            1L,
+            1L,
+            BigDecimal.valueOf(100),
+            Transaction.TransactionType.WITHDRAW,
+            Transaction.OppositePartyType.IBAN,
+            "Bank account",
+            Transaction.TransactionStatus.APPROVED,
+            LocalDateTime.now()
         );
 
-        // Act & Assert
+        when(transactionService.withdraw(any(WithdrawRequest.class))).thenReturn(withdrawalDto);
+
         mockMvc.perform(post("/api/transactions/withdraw")
-                        .header("X-Customer-Id", "1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createTransactionRequest)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Withdrawal transaction created successfully")))
-                .andExpect(jsonPath("$.data.id", is(1)))
-                .andExpect(jsonPath("$.data.type", is("WITHDRAW")));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(withdrawRequest)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Withdrawal created successfully")))
+            .andExpect(jsonPath("$.data.id", is(1)))
+            .andExpect(jsonPath("$.data.type", is("WITHDRAW")));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void withdraw_ShouldReturnInsufficientBalance_WhenBalanceNotEnough() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
-        when(walletService.getWalletByIdAndCustomerId(anyLong(), anyLong())).thenReturn(null); // Not actually used in the test
-        when(transactionService.withdraw(any(CreateTransactionRequest.class)))
-                .thenThrow(new InsufficientBalanceException(BigDecimal.valueOf(100), BigDecimal.valueOf(50)));
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto);
 
-        // Act & Assert
+        when(transactionService.withdraw(any(WithdrawRequest.class)))
+            .thenThrow(new InsufficientBalanceException("Insufficient balance: Required: 100.00, Available: 50.00"));
+
         mockMvc.perform(post("/api/transactions/withdraw")
-                        .header("X-Customer-Id", "1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createTransactionRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.result", is("ERROR")))
-                .andExpect(jsonPath("$.message", containsString("Insufficient balance")))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(withdrawRequest)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.result", is("ERROR")))
+            .andExpect(jsonPath("$.message", containsString("Insufficient balance")))
+            .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test
+    @WithMockCustomer(customerId = 2L, tckn = "98765432109", isEmployee = true)
     void approveTransaction_ShouldReturnApprovedTransaction_WhenEmployeeApprovesValidTransaction() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(true);
-        
-        // Modify transactionDto for approval (was pending, now approved)
+
+        ApproveTransactionRequest approveRequest = new ApproveTransactionRequest(1L, Transaction.TransactionStatus.APPROVED);
+
         TransactionDto pendingTransaction = new TransactionDto(
-                1L,
-                BigDecimal.valueOf(1000),
-                Transaction.Type.WITHDRAW,
-                Transaction.Status.PENDING,
-                "Large withdrawal needs approval",
-                1L,
-                LocalDateTime.now()
+            1L,
+            1L,
+            BigDecimal.valueOf(1000),
+            Transaction.TransactionType.WITHDRAW,
+            Transaction.OppositePartyType.IBAN,
+            "Large withdrawal",
+            Transaction.TransactionStatus.PENDING,
+            LocalDateTime.now()
         );
-        
+
         TransactionDto approvedTransaction = new TransactionDto(
-                1L,
-                BigDecimal.valueOf(1000),
-                Transaction.Type.WITHDRAW,
-                Transaction.Status.COMPLETED,
-                "Large withdrawal needs approval",
-                1L,
-                LocalDateTime.now()
+            1L,
+            1L,
+            BigDecimal.valueOf(1000),
+            Transaction.TransactionType.WITHDRAW,
+            Transaction.OppositePartyType.IBAN,
+            "Large withdrawal",
+            Transaction.TransactionStatus.APPROVED,
+            LocalDateTime.now()
         );
-        
+
         when(transactionService.getTransactionById(anyLong())).thenReturn(pendingTransaction);
-        when(transactionService.approveTransaction(anyLong())).thenReturn(approvedTransaction);
+        when(transactionService.approveTransaction(any(ApproveTransactionRequest.class))).thenReturn(approvedTransaction);
 
-        // Act & Assert
-        mockMvc.perform(put("/api/transactions/1/approve")
-                        .header("X-Customer-Id", "2")) // Employee ID
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Transaction approved successfully")))
-                .andExpect(jsonPath("$.data.id", is(1)))
-                .andExpect(jsonPath("$.data.status", is("COMPLETED")));
+        mockMvc.perform(post("/api/transactions/approve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(approveRequest)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Transaction status updated successfully")))
+            .andExpect(jsonPath("$.data.id", is(1)))
+            .andExpect(jsonPath("$.data.status", is("APPROVED")));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void approveTransaction_ShouldReturnForbidden_WhenRegularCustomerAttemptsApproval() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
+        ApproveTransactionRequest approveRequest = new ApproveTransactionRequest(1L, Transaction.TransactionStatus.APPROVED);
 
-        // Act & Assert
-        mockMvc.perform(put("/api/transactions/1/approve")
-                        .header("X-Customer-Id", "1"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.result", is("ERROR")))
-                .andExpect(jsonPath("$.message", is("Only employees can approve transactions")))
-                .andExpect(jsonPath("$.data").doesNotExist());
+        mockMvc.perform(post("/api/transactions/approve")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(approveRequest)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.result", is("ERROR")))
+            .andExpect(jsonPath("$.message", is("Only employees can approve transactions")))
+            .andExpect(jsonPath("$.data").doesNotExist());
     }
 
     @Test
+    @WithMockCustomer(customerId = 2L, tckn = "98765432109", isEmployee = true)
     void getTransactionsByWalletId_ShouldReturnTransactions_WhenEmployeeRequests() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(true);
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto);
         when(transactionService.getTransactionsByWalletId(anyLong())).thenReturn(List.of(transactionDto));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/transactions/wallet/1")
-                        .header("X-Customer-Id", "2")) // Employee ID
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Transactions retrieved successfully")))
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].id", is(1)));
+        mockMvc.perform(get("/api/transactions/wallet/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Transactions retrieved successfully")))
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].id", is(1)));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void getTransactionsByWalletId_ShouldReturnTransactions_WhenCustomerRequestsOwnWalletTransactions() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
-        when(walletService.getWalletByIdAndCustomerId(anyLong(), anyLong())).thenReturn(null); // Not actually used in the test
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto); // Wallet belongs to customer 1
         when(transactionService.getTransactionsByWalletId(anyLong())).thenReturn(List.of(transactionDto));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/transactions/wallet/1")
-                        .header("X-Customer-Id", "1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Transactions retrieved successfully")))
-                .andExpect(jsonPath("$.data", hasSize(1)))
-                .andExpect(jsonPath("$.data[0].id", is(1)));
+        mockMvc.perform(get("/api/transactions/wallet/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Transactions retrieved successfully")))
+            .andExpect(jsonPath("$.data", hasSize(1)));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void getTransactionsByWalletId_ShouldReturnForbidden_WhenCustomerRequestsOtherWalletTransactions() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
-        when(walletService.getWalletByIdAndCustomerId(anyLong(), anyLong()))
-                .thenThrow(new ResourceNotFoundException("Wallet", "id", 1L));
 
-        // Act & Assert
-        mockMvc.perform(get("/api/transactions/wallet/1")
-                        .header("X-Customer-Id", "2")) // Different customer ID
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.result", is("ERROR")))
-                .andExpect(jsonPath("$.message", is("Wallet not found with id: '1'")))
-                .andExpect(jsonPath("$.data").doesNotExist());
+        WalletDto otherCustomerWallet = new WalletDto(
+            1L,
+            "Other Customer Wallet",
+            Wallet.Currency.USD,
+            true,
+            true,
+            BigDecimal.valueOf(1000),
+            BigDecimal.valueOf(1000),
+            2L
+        );
+
+        when(walletService.getWalletById(anyLong())).thenReturn(otherCustomerWallet);
+
+        mockMvc.perform(get("/api/transactions/wallet/1"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.result", is("ERROR")))
+            .andExpect(jsonPath("$.message", is("You can only view transactions for your own wallets unless you are an employee")));
     }
 
     @Test
+    @WithMockCustomer(customerId = 2L, tckn = "98765432109", isEmployee = true)
     void getTransactionById_ShouldReturnTransaction_WhenEmployeeRequests() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(true);
         when(transactionService.getTransactionById(anyLong())).thenReturn(transactionDto);
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto);
 
-        // Act & Assert
-        mockMvc.perform(get("/api/transactions/1")
-                        .header("X-Customer-Id", "2")) // Employee ID
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Transaction retrieved successfully")))
-                .andExpect(jsonPath("$.data.id", is(1)));
+        mockMvc.perform(get("/api/transactions/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Transaction retrieved successfully")))
+            .andExpect(jsonPath("$.data.id", is(1)));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void getTransactionById_ShouldReturnTransaction_WhenCustomerRequestsOwnTransaction() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
         when(transactionService.getTransactionById(anyLong())).thenReturn(transactionDto);
-        when(walletService.isWalletOwnedByCustomer(anyLong(), anyLong())).thenReturn(true);
+        when(walletService.getWalletById(anyLong())).thenReturn(walletDto);
 
-        // Act & Assert
-        mockMvc.perform(get("/api/transactions/1")
-                        .header("X-Customer-Id", "1"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.result", is("SUCCESS")))
-                .andExpect(jsonPath("$.message", is("Transaction retrieved successfully")))
-                .andExpect(jsonPath("$.data.id", is(1)));
+        mockMvc.perform(get("/api/transactions/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.result", is("SUCCESS")))
+            .andExpect(jsonPath("$.message", is("Transaction retrieved successfully")))
+            .andExpect(jsonPath("$.data.id", is(1)));
     }
 
     @Test
+    @WithMockCustomer(customerId = 1L, tckn = "12345678901", isEmployee = false)
     void getTransactionById_ShouldReturnForbidden_WhenCustomerRequestsOtherTransaction() throws Exception {
-        // Arrange
         when(customerService.isEmployee(anyLong())).thenReturn(false);
         when(transactionService.getTransactionById(anyLong())).thenReturn(transactionDto);
-        when(walletService.isWalletOwnedByCustomer(anyLong(), anyLong())).thenReturn(false);
 
-        // Act & Assert
-        mockMvc.perform(get("/api/transactions/1")
-                        .header("X-Customer-Id", "2")) // Different customer ID
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.result", is("ERROR")))
-                .andExpect(jsonPath("$.message", is("You can only view your own transactions unless you are an employee")))
-                .andExpect(jsonPath("$.data").doesNotExist());
+        WalletDto otherCustomerWallet = new WalletDto(
+            1L,
+            "Other Customer Wallet",
+            Wallet.Currency.USD,
+            true,
+            true,
+            BigDecimal.valueOf(1000),
+            BigDecimal.valueOf(1000),
+            2L
+        );
+
+        when(walletService.getWalletById(anyLong())).thenReturn(otherCustomerWallet);
+
+        mockMvc.perform(get("/api/transactions/1"))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.result", is("ERROR")))
+            .andExpect(jsonPath("$.message", is("You can only view transactions for your own wallets unless you are an employee")));
     }
 } 

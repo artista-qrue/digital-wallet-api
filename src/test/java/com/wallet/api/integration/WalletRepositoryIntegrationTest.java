@@ -35,7 +35,8 @@ public class WalletRepositoryIntegrationTest {
         // Create and persist a customer for wallet tests
         customer = new Customer();
         customer.setTckn("12345678901");
-        customer.setEmail("test@example.com");
+        customer.setName("John");
+        customer.setSurname("Doe");
         customer.setEmployee(false);
         entityManager.persist(customer);
         entityManager.flush();
@@ -172,7 +173,8 @@ public class WalletRepositoryIntegrationTest {
         // Create another customer
         Customer otherCustomer = new Customer();
         otherCustomer.setTckn("98765432109");
-        otherCustomer.setEmail("other@example.com");
+        otherCustomer.setName("Jane");
+        otherCustomer.setSurname("Smith");
         otherCustomer.setEmployee(false);
         entityManager.persist(otherCustomer);
         entityManager.flush();

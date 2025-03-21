@@ -33,6 +33,8 @@ public class TransactionRepositoryIntegrationTest {
         // Create and persist a customer
         customer = new Customer();
         customer.setTckn("12345678901");
+        customer.setName("John");
+        customer.setSurname("Doe");
         entityManager.persist(customer);
 
         // Create and persist a wallet
@@ -54,17 +56,19 @@ public class TransactionRepositoryIntegrationTest {
         // Arrange
         Transaction deposit = new Transaction();
         deposit.setAmount(BigDecimal.valueOf(500));
-        deposit.setType(Transaction.Type.DEPOSIT);
-        deposit.setStatus(Transaction.Status.COMPLETED);
-        deposit.setDescription("Test deposit");
+        deposit.setType(Transaction.TransactionType.DEPOSIT);
+        deposit.setStatus(Transaction.TransactionStatus.APPROVED);
+        deposit.setOppositeParty("Test deposit");
+        deposit.setOppositePartyType(Transaction.OppositePartyType.IBAN);
         deposit.setWallet(wallet);
         entityManager.persist(deposit);
 
         Transaction withdraw = new Transaction();
         withdraw.setAmount(BigDecimal.valueOf(200));
-        withdraw.setType(Transaction.Type.WITHDRAW);
-        withdraw.setStatus(Transaction.Status.COMPLETED);
-        withdraw.setDescription("Test withdrawal");
+        withdraw.setType(Transaction.TransactionType.WITHDRAW);
+        withdraw.setStatus(Transaction.TransactionStatus.APPROVED);
+        withdraw.setOppositeParty("Test withdrawal");
+        withdraw.setOppositePartyType(Transaction.OppositePartyType.IBAN);
         withdraw.setWallet(wallet);
         entityManager.persist(withdraw);
         
@@ -78,7 +82,7 @@ public class TransactionRepositoryIntegrationTest {
         assertThat(transactions).extracting(Transaction::getAmount)
                 .containsExactlyInAnyOrder(BigDecimal.valueOf(500), BigDecimal.valueOf(200));
         assertThat(transactions).extracting(Transaction::getType)
-                .containsExactlyInAnyOrder(Transaction.Type.DEPOSIT, Transaction.Type.WITHDRAW);
+                .containsExactlyInAnyOrder(Transaction.TransactionType.DEPOSIT, Transaction.TransactionType.WITHDRAW);
     }
 
     @Test
@@ -86,9 +90,10 @@ public class TransactionRepositoryIntegrationTest {
         // Arrange
         Transaction transaction = new Transaction();
         transaction.setAmount(BigDecimal.valueOf(500));
-        transaction.setType(Transaction.Type.DEPOSIT);
-        transaction.setStatus(Transaction.Status.COMPLETED);
-        transaction.setDescription("Test transaction");
+        transaction.setType(Transaction.TransactionType.DEPOSIT);
+        transaction.setStatus(Transaction.TransactionStatus.APPROVED);
+        transaction.setOppositeParty("Test transaction");
+        transaction.setOppositePartyType(Transaction.OppositePartyType.IBAN);
         transaction.setWallet(wallet);
         Transaction savedTransaction = entityManager.persist(transaction);
         entityManager.flush();
@@ -99,9 +104,9 @@ public class TransactionRepositoryIntegrationTest {
         // Assert
         assertThat(found).isPresent();
         assertThat(found.get().getAmount()).isEqualByComparingTo(BigDecimal.valueOf(500));
-        assertThat(found.get().getType()).isEqualTo(Transaction.Type.DEPOSIT);
-        assertThat(found.get().getStatus()).isEqualTo(Transaction.Status.COMPLETED);
-        assertThat(found.get().getDescription()).isEqualTo("Test transaction");
+        assertThat(found.get().getType()).isEqualTo(Transaction.TransactionType.DEPOSIT);
+        assertThat(found.get().getStatus()).isEqualTo(Transaction.TransactionStatus.APPROVED);
+        assertThat(found.get().getOppositeParty()).isEqualTo("Test transaction");
         assertThat(found.get().getWallet().getId()).isEqualTo(wallet.getId());
     }
 
@@ -115,41 +120,44 @@ public class TransactionRepositoryIntegrationTest {
     }
 
     @Test
-    void findByStatusAndAmountGreaterThan_ShouldReturnTransactions_WhenMatchingCriteria() {
+    void findByWalletIdAndStatus_ShouldReturnTransactions_WhenMatchingCriteria() {
         // Arrange
         Transaction smallDeposit = new Transaction();
         smallDeposit.setAmount(BigDecimal.valueOf(100));
-        smallDeposit.setType(Transaction.Type.DEPOSIT);
-        smallDeposit.setStatus(Transaction.Status.COMPLETED);
-        smallDeposit.setDescription("Small deposit");
+        smallDeposit.setType(Transaction.TransactionType.DEPOSIT);
+        smallDeposit.setStatus(Transaction.TransactionStatus.APPROVED);
+        smallDeposit.setOppositeParty("Small deposit");
+        smallDeposit.setOppositePartyType(Transaction.OppositePartyType.IBAN);
         smallDeposit.setWallet(wallet);
         entityManager.persist(smallDeposit);
 
         Transaction largeDeposit = new Transaction();
         largeDeposit.setAmount(BigDecimal.valueOf(1000));
-        largeDeposit.setType(Transaction.Type.DEPOSIT);
-        largeDeposit.setStatus(Transaction.Status.PENDING);
-        largeDeposit.setDescription("Large deposit");
+        largeDeposit.setType(Transaction.TransactionType.DEPOSIT);
+        largeDeposit.setStatus(Transaction.TransactionStatus.PENDING);
+        largeDeposit.setOppositeParty("Large deposit");
+        largeDeposit.setOppositePartyType(Transaction.OppositePartyType.IBAN);
         largeDeposit.setWallet(wallet);
         entityManager.persist(largeDeposit);
 
         Transaction largeWithdrawal = new Transaction();
         largeWithdrawal.setAmount(BigDecimal.valueOf(800));
-        largeWithdrawal.setType(Transaction.Type.WITHDRAW);
-        largeWithdrawal.setStatus(Transaction.Status.PENDING);
-        largeWithdrawal.setDescription("Large withdrawal");
+        largeWithdrawal.setType(Transaction.TransactionType.WITHDRAW);
+        largeWithdrawal.setStatus(Transaction.TransactionStatus.PENDING);
+        largeWithdrawal.setOppositeParty("Large withdrawal");
+        largeWithdrawal.setOppositePartyType(Transaction.OppositePartyType.IBAN);
         largeWithdrawal.setWallet(wallet);
         entityManager.persist(largeWithdrawal);
         
         entityManager.flush();
 
         // Act
-        List<Transaction> pendingLargeTransactions = transactionRepository
-                .findByStatusAndAmountGreaterThan(Transaction.Status.PENDING, BigDecimal.valueOf(500));
+        List<Transaction> pendingTransactions = transactionRepository
+                .findByWalletIdAndStatus(wallet.getId(), Transaction.TransactionStatus.PENDING);
 
         // Assert
-        assertThat(pendingLargeTransactions).hasSize(2);
-        assertThat(pendingLargeTransactions).extracting(Transaction::getDescription)
+        assertThat(pendingTransactions).hasSize(2);
+        assertThat(pendingTransactions).extracting(Transaction::getOppositeParty)
                 .containsExactlyInAnyOrder("Large deposit", "Large withdrawal");
     }
 } 

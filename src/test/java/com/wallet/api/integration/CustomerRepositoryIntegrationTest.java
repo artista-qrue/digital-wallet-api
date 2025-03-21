@@ -25,11 +25,9 @@ public class CustomerRepositoryIntegrationTest {
     void findByTckn_ShouldReturnCustomer_WhenTcknExists() {
         // Arrange
         Customer customer = new Customer();
-        customer.setFirstName("John");
-        customer.setLastName("Doe");
+        customer.setName("John");
+        customer.setSurname("Doe");
         customer.setTckn("12345678901");
-        customer.setEmail("john.doe@example.com");
-        customer.setPhoneNumber("1234567890");
         customer.setEmployee(false);
         entityManager.persist(customer);
         entityManager.flush();
@@ -39,11 +37,9 @@ public class CustomerRepositoryIntegrationTest {
 
         // Assert
         assertThat(found).isPresent();
-        assertThat(found.get().getFirstName()).isEqualTo("John");
-        assertThat(found.get().getLastName()).isEqualTo("Doe");
+        assertThat(found.get().getName()).isEqualTo("John");
+        assertThat(found.get().getSurname()).isEqualTo("Doe");
         assertThat(found.get().getTckn()).isEqualTo("12345678901");
-        assertThat(found.get().getEmail()).isEqualTo("john.doe@example.com");
-        assertThat(found.get().getPhoneNumber()).isEqualTo("1234567890");
         assertThat(found.get().isEmployee()).isFalse();
     }
 
@@ -60,11 +56,9 @@ public class CustomerRepositoryIntegrationTest {
     void existsByTckn_ShouldReturnTrue_WhenTcknExists() {
         // Arrange
         Customer customer = new Customer();
-        customer.setFirstName("Jane");
-        customer.setLastName("Smith");
+        customer.setName("Jane");
+        customer.setSurname("Smith");
         customer.setTckn("98765432109");
-        customer.setEmail("jane.smith@example.com");
-        customer.setPhoneNumber("9876543210");
         customer.setEmployee(true);
         entityManager.persist(customer);
         entityManager.flush();
@@ -89,20 +83,16 @@ public class CustomerRepositoryIntegrationTest {
     void findAll_ShouldReturnAllCustomers() {
         // Arrange
         Customer customer1 = new Customer();
-        customer1.setFirstName("John");
-        customer1.setLastName("Doe");
+        customer1.setName("John");
+        customer1.setSurname("Doe");
         customer1.setTckn("12345678901");
-        customer1.setEmail("john.doe@example.com");
-        customer1.setPhoneNumber("1234567890");
         customer1.setEmployee(false);
         entityManager.persist(customer1);
 
         Customer customer2 = new Customer();
-        customer2.setFirstName("Jane");
-        customer2.setLastName("Smith");
+        customer2.setName("Jane");
+        customer2.setSurname("Smith");
         customer2.setTckn("98765432109");
-        customer2.setEmail("jane.smith@example.com");
-        customer2.setPhoneNumber("9876543210");
         customer2.setEmployee(true);
         entityManager.persist(customer2);
         
