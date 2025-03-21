@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:14-alpine
     container_name: wallet-db
@@ -20,7 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Digital Wallet API Application
   wallet-api:
     build:
       context: .
@@ -47,7 +45,6 @@ services:
       retries: 3
       start_period: 40s
 
-  # PGAdmin for database management (optional)
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: wallet-pgadmin

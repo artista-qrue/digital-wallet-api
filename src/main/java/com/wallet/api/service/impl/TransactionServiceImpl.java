@@ -42,13 +42,11 @@ public class TransactionServiceImpl implements TransactionService {
         transaction.setOppositeParty(request.source());
         transaction.setTransactionDate(LocalDateTime.now());
         
-        // Determine transaction status based on amount
         Transaction.TransactionStatus status = request.amount().compareTo(THRESHOLD_AMOUNT) > 0
                 ? Transaction.TransactionStatus.PENDING
                 : Transaction.TransactionStatus.APPROVED;
         transaction.setStatus(status);
         
-        // Update wallet balances
         updateWalletBalancesForDeposit(wallet, request.amount(), status);
         
         Transaction savedTransaction = transactionRepository.save(transaction);
@@ -61,12 +59,10 @@ public class TransactionServiceImpl implements TransactionService {
         Wallet wallet = walletRepository.findById(request.walletId())
                 .orElseThrow(() -> new ResourceNotFoundException("Wallet", "id", request.walletId()));
         
-        // Check if wallet is active for withdraw
         if (!wallet.getActiveForWithdraw()) {
             throw new IllegalArgumentException("Wallet is not active for withdrawals");
         }
         
-        // Check if wallet has enough usable balance
         if (wallet.getUsableBalance().compareTo(request.amount()) < 0) {
             throw new InsufficientBalanceException(wallet.getId(),
                     request.amount().doubleValue(), wallet.getUsableBalance().doubleValue());
@@ -80,13 +76,11 @@ public class TransactionServiceImpl implements TransactionService {
         transaction.setOppositeParty(request.destination());
         transaction.setTransactionDate(LocalDateTime.now());
         
-        // Determine transaction status based on amount
         Transaction.TransactionStatus status = request.amount().compareTo(THRESHOLD_AMOUNT) > 0
                 ? Transaction.TransactionStatus.PENDING
                 : Transaction.TransactionStatus.APPROVED;
         transaction.setStatus(status);
         
-        // Update wallet balances
         updateWalletBalancesForWithdraw(wallet, request.amount(), status);
         
         Transaction savedTransaction = transactionRepository.save(transaction);
@@ -99,16 +93,13 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction transaction = transactionRepository.findById(request.transactionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", request.transactionId()));
         
-        // Validate the transaction can be approved/denied
         if (transaction.getStatus() != Transaction.TransactionStatus.PENDING) {
             throw new IllegalArgumentException("Only pending transactions can be approved or denied");
         }
         
-        // Update transaction status
         Transaction.TransactionStatus oldStatus = transaction.getStatus();
         transaction.setStatus(request.status());
         
-        // Update wallet balances based on new status
         Wallet wallet = transaction.getWallet();
         if (transaction.getType() == Transaction.TransactionType.DEPOSIT) {
             handleDepositApproval(wallet, transaction.getAmount(), oldStatus, request.status());
@@ -161,10 +152,8 @@ public class TransactionServiceImpl implements TransactionService {
     }
     
     private void updateWalletBalancesForDeposit(Wallet wallet, BigDecimal amount, Transaction.TransactionStatus status) {
-        // Always update the balance regardless of status
         wallet.setBalance(wallet.getBalance().add(amount));
         
-        // Only update usable balance if transaction is approved
         if (status == Transaction.TransactionStatus.APPROVED) {
             wallet.setUsableBalance(wallet.getUsableBalance().add(amount));
         }
@@ -173,10 +162,8 @@ public class TransactionServiceImpl implements TransactionService {
     }
     
     private void updateWalletBalancesForWithdraw(Wallet wallet, BigDecimal amount, Transaction.TransactionStatus status) {
-        // Always reduce usable balance
         wallet.setUsableBalance(wallet.getUsableBalance().subtract(amount));
         
-        // If approved, reduce balance as well
         if (status == Transaction.TransactionStatus.APPROVED) {
             wallet.setBalance(wallet.getBalance().subtract(amount));
         }
@@ -189,10 +176,8 @@ public class TransactionServiceImpl implements TransactionService {
                                      Transaction.TransactionStatus newStatus) {
         if (oldStatus == Transaction.TransactionStatus.PENDING) {
             if (newStatus == Transaction.TransactionStatus.APPROVED) {
-                // Pending -> Approved: Update usable balance
                 wallet.setUsableBalance(wallet.getUsableBalance().add(amount));
             } else if (newStatus == Transaction.TransactionStatus.DENIED) {
-                // Pending -> Denied: Revert balance change
                 wallet.setBalance(wallet.getBalance().subtract(amount));
             }
         }
@@ -204,10 +189,8 @@ public class TransactionServiceImpl implements TransactionService {
                                       Transaction.TransactionStatus newStatus) {
         if (oldStatus == Transaction.TransactionStatus.PENDING) {
             if (newStatus == Transaction.TransactionStatus.APPROVED) {
-                // Pending -> Approved: Update balance (usable already reduced)
                 wallet.setBalance(wallet.getBalance().subtract(amount));
             } else if (newStatus == Transaction.TransactionStatus.DENIED) {
-                // Pending -> Denied: Restore usable balance
                 wallet.setUsableBalance(wallet.getUsableBalance().add(amount));
             }
         }

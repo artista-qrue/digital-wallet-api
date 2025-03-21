@@ -44,7 +44,6 @@ public class WalletServiceImpl implements WalletService {
     
     @Override
     public List<WalletDto> getWalletsByCustomerId(Long customerId) {
-        // Check if customer exists
         if (!customerRepository.existsById(customerId)) {
             throw new ResourceNotFoundException("Customer", "id", customerId);
         }
@@ -56,7 +55,6 @@ public class WalletServiceImpl implements WalletService {
     
     @Override
     public List<WalletDto> getWalletsByCustomerIdAndCurrency(Long customerId, Wallet.Currency currency) {
-        // Check if customer exists
         if (!customerRepository.existsById(customerId)) {
             throw new ResourceNotFoundException("Customer", "id", customerId);
         }

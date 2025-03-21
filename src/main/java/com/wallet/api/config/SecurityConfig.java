@@ -23,12 +23,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(authorize -> authorize
-                // Permit access to H2 console
                 .requestMatchers("/h2-console/**").permitAll()
-                // Permit access to health check and docs
                 .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll()
-                // For demo purposes, allowing all endpoints to be accessible for demonstration
-                // In a real production environment, these would need appropriate authorization
                 .requestMatchers("/api/**").permitAll()
                 .anyRequest().authenticated()
             )
