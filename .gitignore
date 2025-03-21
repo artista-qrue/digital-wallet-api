@@ -1,0 +1,75 @@
+# Compiled class files
+*.class
+
+# Log files
+/logs/
+*.log
+*.log.*
+
+# Package files
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Spring Boot
+.spring-boot-devtools.properties
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+.vscode/
+*.launch
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Environment variables
+.env
+*.env
+
+# Docker
+.docker/
+
+# Testing
+/coverage/
+.sonar/
+.scannerwork/
+jacoco.exec
+
+# Node modules (if using frontend)
+/node_modules/
+/dist/
+
+# Application specific
+application-dev-local.properties
+application-local.properties
+
+# Security
+*.jks
+*.p12
+*.pem
+*.cert
+*.key 

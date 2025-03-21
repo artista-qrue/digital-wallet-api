@@ -37,7 +37,7 @@ A Spring Boot REST API for managing digital wallets, enabling customers and empl
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/digital-wallet-api.git
+git clone https://github.com/artista-qrue/digital-wallet-api.git
 cd digital-wallet-api
 
 # Build the application
