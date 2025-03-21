@@ -97,12 +97,38 @@ The API documentation is available through Swagger UI at:
 http://localhost:8080/swagger-ui.html
 ```
 
-You can explore all endpoints, models, and test the API directly from the Swagger UI interface.
+#### Using Swagger UI
+
+1. **Exploring Endpoints**:
+   - Browse all available endpoints organized by controller
+   - Expand each endpoint to see request parameters, response models, and sample requests
+
+2. **Authentication in Swagger UI**:
+   - Click the "Authorize" button (lock icon) at the top right
+   - Enter your JWT token with the format: `Bearer your-jwt-token`
+   - Click "Authorize" and close the dialog
+   - All subsequent requests will include this authentication header
+
+3. **Testing Endpoints**:
+   - Click "Try it out" on any endpoint
+   - Fill in the required parameters
+   - Click "Execute" to send the request
+   - View the response status, headers, and body
+
+4. **Troubleshooting**:
+   - If you don't see an Authorization header option, you may need to add it manually in the "Try it out" section
+   - For endpoints that require authorization but aren't showing the auth header, use the direct token endpoint first:
+     ```
+     POST /setup/direct-token
+     ```
+   - Then copy the token and use it in your requests
 
 The raw OpenAPI specification is available at:
 ```
 http://localhost:8080/api-docs
 ```
+
+You can also import this specification into tools like Postman or Insomnia for API testing.
 
 ## Profiles
 
@@ -198,11 +224,37 @@ The application exposes metrics and health information via Spring Boot Actuator:
 
 ## Request and Response Examples
 
+### Login and Get Token
+
+Request:
+```json
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "tckn": "12345678901"
+}
+```
+
+Response:
+```json
+{
+  "result": "SUCCESS",
+  "message": "Authentication successful",
+  "data": {
+    "token": "eyJhbGciOiJIUzUxMiJ9...",
+    "customerId": 1,
+    "isEmployee": true
+  }
+}
+```
+
 ### Create a Customer
 
 Request:
 ```json
 POST /api/customers
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 Content-Type: application/json
 
 {
@@ -219,7 +271,7 @@ Response:
   "result": "SUCCESS",
   "message": "Customer created successfully",
   "data": {
-    "id": 1,
+    "id": 2,
     "name": "John",
     "surname": "Doe",
     "tckn": "12345678901",
@@ -233,7 +285,7 @@ Response:
 Request:
 ```
 GET /api/customers/1
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 ```
 
 Response:
@@ -242,7 +294,7 @@ Response:
   "result": "SUCCESS",
   "message": "Customer retrieved successfully",
   "data": {
-    "id": 1,
+    "id": 2,
     "name": "John",
     "surname": "Doe",
     "tckn": "12345678901",
@@ -256,7 +308,7 @@ Response:
 Request:
 ```json
 POST /api/wallets
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 Content-Type: application/json
 
 {
@@ -264,7 +316,7 @@ Content-Type: application/json
   "currency": "TRY",
   "activeForShopping": true,
   "activeForWithdraw": true,
-  "customerId": 1
+  "customerId": 2
 }
 ```
 
@@ -291,7 +343,7 @@ Response:
 Request:
 ```
 GET /api/wallets/customer/1
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 ```
 
 Response:
@@ -308,7 +360,7 @@ Response:
       "activeForWithdraw": true,
       "balance": 500.00,
       "usableBalance": 300.00,
-      "customerId": 1
+      "customerId": 2
     },
     {
       "id": 2,
@@ -318,7 +370,7 @@ Response:
       "activeForWithdraw": false,
       "balance": 100.00,
       "usableBalance": 100.00,
-      "customerId": 1
+      "customerId": 2
     }
   ]
 }
@@ -329,7 +381,7 @@ Response:
 Request:
 ```json
 POST /api/transactions/deposit
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 Content-Type: application/json
 
 {
@@ -362,7 +414,7 @@ Response:
 Request:
 ```json
 POST /api/transactions/approve
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 Content-Type: application/json
 
 {
@@ -394,7 +446,7 @@ Response:
 Request:
 ```json
 POST /api/transactions/withdraw
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 Content-Type: application/json
 
 {
@@ -428,7 +480,7 @@ Response:
 Request:
 ```json
 POST /api/transactions/withdraw
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 Content-Type: application/json
 
 {
@@ -462,7 +514,7 @@ Response:
 Request:
 ```
 PUT /api/transactions/3/approve
-X-Customer-Id: 2
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 ```
 
 Response:
@@ -488,7 +540,7 @@ Response:
 Request:
 ```
 GET /api/transactions/wallet/1
-X-Customer-Id: 1
+Authorization: Bearer eyJhbGciOiJIUzUxMiJ9...
 ```
 
 Response:
@@ -531,14 +583,111 @@ Response:
 }
 ```
 
-## Authorization
+## Authorization and Authentication
 
-All API requests require a `X-Customer-Id` header that specifies the ID of the customer making the request. This is used to enforce the following rules:
+The API uses JWT (JSON Web Token) authentication for secure access:
 
-- Regular customers can only operate on their own wallets and transactions.
-- Employees can operate on all wallets and transactions.
+### Authentication Flow
 
-In a production environment, this would be replaced with proper JWT-based authentication and authorization.
+1. **Setup Admin** (for new deployments):
+   ```
+   GET /setup/init
+   ```
+   This will create an admin user with TCKN `99999999999` if one doesn't exist.
+
+2. **Direct Token Generation** (recommended for API testing):
+   ```bash
+   curl -X POST http://localhost:8080/setup/direct-token
+   ```
+   This endpoint returns a valid JWT token for the admin user, bypassing the regular authentication flow.
+
+3. **Regular Login**:
+   ```bash
+   curl -X POST \
+     http://localhost:8080/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"tckn": "99999999999"}'
+   ```
+   
+4. **Using the Token**: Include the token in all subsequent API requests:
+   ```bash
+   curl -X GET \
+     http://localhost:8080/api/customers \
+     -H "Authorization: Bearer eyJhbGciOiJIUzUxMiJ9..."
+   ```
+
+### Swagger UI Authorization
+
+To use secured endpoints in Swagger UI:
+
+1. First, get a token using the direct token endpoint:
+   ```bash
+   curl -X POST http://localhost:8080/setup/direct-token | grep -o '"token":"[^"]*"'
+   ```
+
+2. Access Swagger UI at: `http://localhost:8080/swagger-ui.html`
+
+3. Click the "Authorize" button (lock icon) at the top right
+
+4. In the value field, enter: `Bearer your-jwt-token` (paste the complete token)
+
+5. Click "Authorize" and close the dialog
+
+6. Now all your API requests through Swagger UI will include the JWT token
+
+Example of using the token in a curl request:
+```bash
+curl -X 'GET' \
+  'http://localhost:8080/api/customers' \
+  -H 'accept: */*' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzUxMiJ9.eyJpc0VtcGxveWVlIjp0cnVlLCJjdXN0b21lcklkIjoxLCJpYXQiOjE3NDI1NzA5MDYsImV4cCI6MTc0MjY1NzMwNn0.ahCn4oxq9EIgtZQcR7VwhWmA8AhV31cMQnzlzHsj-b549v5Bqjp_i_0_4fwU_mKQ-I8jWARwzTz1henDYAyn3Q'
+```
+
+### Important Notes About JWT Authentication
+
+- The JWT token contains claims like `customerId` and `isEmployee` that are used for authorization
+- Tokens are valid for 24 hours by default
+- All secured endpoints require a valid JWT token in the Authorization header
+- The token must be in the format: `Bearer <token>`
+- Tokens generated from `/setup/direct-token` include the subject claim with the customer ID
+
+### Endpoints Not Requiring Authentication
+
+The following endpoints do not require authentication:
+
+- `/api/auth/**` - Authentication endpoints
+- `/setup/**` - Setup and initialization endpoints
+- `/h2-console/**` - H2 database console (dev only)
+- `/actuator/health` - Health check endpoint
+- `/v3/api-docs/**` - API documentation
+- `/swagger-ui/**` - Swagger UI interface
+- `/api-docs/**` - OpenAPI documentation
+
+### Role-Based Authorization
+
+- **Employee-Only Endpoints**:
+  - `POST /api/customers` - Create a new customer
+  - `GET /api/customers` - List all customers
+  - `PUT /api/transactions/{id}/approve` - Approve a transaction
+
+- **Customer-Specific Endpoints**:
+  - Regular customers can only access their own wallets and transactions
+  - Employees can access all wallets and transactions
+
+### Troubleshooting Authentication
+
+If you encounter JWT signing key issues:
+1. Try the `/setup/direct-token` endpoint to generate a token with a secure key
+2. For development, you can also create a regular customer using:
+   ```bash
+   curl -X POST http://localhost:8080/setup/customer
+   ```
+   Then use the returned TCKN to log in
+
+If you can't access protected endpoints:
+1. Verify your JWT token is valid and not expired
+2. Ensure you're using the correct format: `Authorization: Bearer your-token`
+3. Check that you have the appropriate role (employee/customer) for the endpoint
 
 ## Error Handling
 

@@ -4,6 +4,7 @@ import com.wallet.api.dto.*;
 import com.wallet.api.entity.Transaction;
 import com.wallet.api.entity.Wallet;
 import com.wallet.api.model.ApiResponse;
+import com.wallet.api.security.CustomerPrincipal;
 import com.wallet.api.service.CustomerService;
 import com.wallet.api.service.TransactionService;
 import com.wallet.api.service.WalletService;
@@ -11,6 +12,8 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,9 +33,12 @@ public class TransactionController {
     
     @PostMapping("/deposit")
     public ResponseEntity<ApiResponse<TransactionDto>> deposit(
-            @Valid @RequestBody DepositRequest request,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+            @Valid @RequestBody DepositRequest request) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             WalletDto wallet = walletService.getWalletById(request.walletId());
             
             // Check if the requesting customer is an employee or owns the wallet
@@ -55,9 +61,12 @@ public class TransactionController {
     
     @PostMapping("/withdraw")
     public ResponseEntity<ApiResponse<TransactionDto>> withdraw(
-            @Valid @RequestBody WithdrawRequest request,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+            @Valid @RequestBody WithdrawRequest request) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             WalletDto wallet = walletService.getWalletById(request.walletId());
             
             // Check if the requesting customer is an employee or owns the wallet
@@ -80,9 +89,12 @@ public class TransactionController {
     
     @PostMapping("/approve")
     public ResponseEntity<ApiResponse<TransactionDto>> approveTransaction(
-            @Valid @RequestBody ApproveTransactionRequest request,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+            @Valid @RequestBody ApproveTransactionRequest request) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             // Only employees can approve transactions
             if (!customerService.isEmployee(requestingCustomerId)) {
                 return new ResponseEntity<>(
@@ -101,9 +113,12 @@ public class TransactionController {
     
     @GetMapping("/wallet/{walletId}")
     public ResponseEntity<ApiResponse<List<TransactionDto>>> getTransactionsByWalletId(
-            @PathVariable Long walletId,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+            @PathVariable Long walletId) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             WalletDto wallet = walletService.getWalletById(walletId);
             
             // Check if the requesting customer is an employee or owns the wallet
@@ -125,9 +140,12 @@ public class TransactionController {
     @GetMapping("/wallet/{walletId}/type/{type}")
     public ResponseEntity<ApiResponse<List<TransactionDto>>> getTransactionsByWalletIdAndType(
             @PathVariable Long walletId,
-            @PathVariable Transaction.TransactionType type,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+            @PathVariable Transaction.TransactionType type) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             WalletDto wallet = walletService.getWalletById(walletId);
             
             // Check if the requesting customer is an employee or owns the wallet
@@ -149,9 +167,12 @@ public class TransactionController {
     @GetMapping("/wallet/{walletId}/status/{status}")
     public ResponseEntity<ApiResponse<List<TransactionDto>>> getTransactionsByWalletIdAndStatus(
             @PathVariable Long walletId,
-            @PathVariable Transaction.TransactionStatus status,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+            @PathVariable Transaction.TransactionStatus status) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             WalletDto wallet = walletService.getWalletById(walletId);
             
             // Check if the requesting customer is an employee or owns the wallet
@@ -171,10 +192,12 @@ public class TransactionController {
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<TransactionDto>> getTransactionById(
-            @PathVariable Long id,
-            @RequestHeader("X-Customer-Id") Long requestingCustomerId) {
+    public ResponseEntity<ApiResponse<TransactionDto>> getTransactionById(@PathVariable Long id) {
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            CustomerPrincipal customerPrincipal = (CustomerPrincipal) authentication.getPrincipal();
+            Long requestingCustomerId = customerPrincipal.getCustomerId();
+            
             TransactionDto transaction = transactionService.getTransactionById(id);
             WalletDto wallet = walletService.getWalletById(transaction.walletId());
             
